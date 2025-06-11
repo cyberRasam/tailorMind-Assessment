@@ -63,6 +63,11 @@ export const NoticeData: React.FC<NoticeDataProps> = ({
       { accessorKey: 'title', header: 'Title', minWidth: 120 },
       { accessorKey: 'author', header: 'Author', minWidth: 110 },
       {
+        accessorKey: 'description',
+        header: 'Description',
+        minWidth: 200,
+      },
+      {
         accessorKey: 'status',
         header: 'Status',
         minWidth: 150,
