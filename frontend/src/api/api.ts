@@ -31,6 +31,10 @@ const baseQueryWithReauth: BaseQueryFn<string | FetchArgs, unknown, FetchBaseQue
   if (result.error && result.error.status === 401) {
     const refreshResult = await baseQuery('/auth/refresh', api, extraOptions);
     if (refreshResult.data) {
+      // If the refresh endpoint returns a new CSRF token, update it in cookies
+      if ((refreshResult.data as any).csrfToken) {
+        Cookies.set('csrfToken', (refreshResult.data as any).csrfToken);
+      }
       result = await baseQuery(args, api, extraOptions);
     } else {
       api.dispatch(resetUser());

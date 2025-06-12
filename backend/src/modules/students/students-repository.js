@@ -46,8 +46,16 @@ const findAllStudents = async (payload) => {
 const addOrUpdateStudent = async (payload) => {
     const query = "SELECT * FROM student_add_update($1)";
     const queryParams = [payload];
+    try {
     const { rows } = await processDBRequest({ query, queryParams });
-    return rows[0];
+    return rows[0]; // Expected to be { status, message, userId? }
+  } catch (error) {
+    console.error("DB Error in addOrUpdateStudent:", error);
+    return {
+    status: false,
+    message: error.message || "Failed to add/update student"
+    };
+  }
 }
 
 const findStudentDetail = async (id) => {
@@ -111,11 +119,22 @@ const findStudentToUpdate = async (paylaod) => {
     return rows;
 }
 
+const deleteStudent = async (id) => {
+    const query = "DELETE FROM users WHERE id = $1";
+    const queryParams = [id];
+    const { rowCount } = await processDBRequest({ query, queryParams });
+    if (rowCount <= 0) {
+        throw new Error("Unable to delete student");
+    }
+    return "Student deleted successfully";
+}
+
 module.exports = {
     getRoleId,
     findAllStudents,
     addOrUpdateStudent,
     findStudentDetail,
     findStudentToSetStatus,
-    findStudentToUpdate
+    findStudentToUpdate,
+    deleteStudent,
 };

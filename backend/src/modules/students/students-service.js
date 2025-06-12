@@ -1,5 +1,5 @@
 const { ApiError, sendAccountVerificationEmail } = require("../../utils");
-const { findAllStudents, findStudentDetail, findStudentToSetStatus, addOrUpdateStudent } = require("./students-repository");
+const { findAllStudents, findStudentDetail, findStudentToSetStatus, addOrUpdateStudent, deleteStudent } = require("./students-repository");
 const { findUserById } = require("../../shared/repository");
 
 const checkStudentId = async (id) => {
@@ -32,11 +32,13 @@ const getStudentDetail = async (id) => {
 const addNewStudent = async (payload) => {
     const ADD_STUDENT_AND_EMAIL_SEND_SUCCESS = "Student added and verification email sent successfully.";
     const ADD_STUDENT_AND_BUT_EMAIL_SEND_FAIL = "Student added, but failed to send verification email.";
+
+    let result;
     try {
-        const result = await addOrUpdateStudent(payload);
-        if (!result.status) {
-            throw new ApiError(500, result.message);
-        }
+        result = await addOrUpdateStudent(payload);
+        // if (!result.status) {
+        //     throw new ApiError(501, result.message);
+        // }
 
         try {
             await sendAccountVerificationEmail({ userId: result.userId, userEmail: payload.email });
@@ -45,14 +47,17 @@ const addNewStudent = async (payload) => {
             return { message: ADD_STUDENT_AND_BUT_EMAIL_SEND_FAIL }
         }
     } catch (error) {
-        throw new ApiError(500, "Unable to add student");
+        console.error("Error in addNewStudent:", error);
+
+        throw new ApiError(500, result.message || "Unable to add student2");
     }
 }
 
 const updateStudent = async (payload) => {
     const result = await addOrUpdateStudent(payload);
-    if (!result.status) {
-        throw new ApiError(500, result.message);
+    
+    if (!result) {
+        throw new ApiError(500, "Unable to update student");
     }
 
     return { message: result.message };
@@ -69,10 +74,22 @@ const setStudentStatus = async ({ userId, reviewerId, status }) => {
     return { message: "Student status changed successfully" };
 }
 
+const deleteStudentById = async (id) => {
+    await checkStudentId(id);
+
+    const message = await deleteStudent(id);
+    if (!message) {
+        throw new ApiError(500, "Unable to delete student");
+    }
+
+    return { message };
+}
+
 module.exports = {
     getAllStudents,
     getStudentDetail,
     addNewStudent,
     setStudentStatus,
     updateStudent,
+    deleteStudentById,
 };

@@ -7,7 +7,7 @@ const authenticateToken = (req, res, next) => {
   const refreshToken = req.cookies.refreshToken;
 
   if (!accessToken || !refreshToken) {
-    throw new ApiError(401, "Unauthorized. Please provide valid tokens.");
+    throw new ApiError(401, "Unauthorized1. Please provide valid tokens.");
   }
 
   jwt.verify(accessToken, env.JWT_ACCESS_TOKEN_SECRET, (err, user) => {
@@ -25,10 +25,10 @@ const authenticateToken = (req, res, next) => {
         if (err) {
           throw new ApiError(
             401,
-            "Unauthorized. Please provide valid refresh token."
+            "Unauthorized2. Please provide valid refresh token."
           );
         }
-
+        console.log("User authenticated successfully:", user, refreshToken);
         req.user = user;
         req.refreshToken = refreshToken;
         next();
