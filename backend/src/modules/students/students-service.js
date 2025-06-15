@@ -1,8 +1,8 @@
 const { ApiError, sendAccountVerificationEmail } = require("../../utils");
 const { findAllStudents, findStudentDetail, findStudentToSetStatus, deleteStudent, updateUserProfile, updateUser, createUserProfile, createUser, findUserByEmail } = require("./students-repository");
 const { findUserById } = require("../../shared/repository");
-const { getAllClasses } = require("../classes/classes-repository");
-const { getAllSections } = require("../sections/section-repository");
+const { getAllClasses, getClassByName } = require("../classes/classes-repository");
+const { getAllSections, getSectionByName } = require("../sections/section-repository");
 
 const checkStudentId = async (id) => {
     const isStudentFound = await findUserById(id);
@@ -32,35 +32,32 @@ const getStudentDetail = async (id) => {
 }
 
 const validateClassAndSection = async (className, sectionName) => {
-    // Get all active classes
-    const allClasses = await getAllClasses();
-    
     // Check if class exists
-    const classData = allClasses.find(cls => cls.class_name === className);
+    const classData = await getClassByName(className);
     if (!classData) {
-        const availableClasses = allClasses.map(cls => cls.class_name).join(', ');
+        // Get all available classes for error message
+        const allClasses = await getAllClasses();
+        const availableClasses = allClasses.map(cls => cls.name).join(', ');
         throw new Error(`Class '${className}' does not exist. Available classes: ${availableClasses}`);
     }
     
-    // Get all active sections
-    const allSections = await getAllSections();
-    
-    // Check if section exists for this class
-    const sectionData = allSections.find(sec => 
-        sec.section_name === sectionName && sec.class_name === className
-    );
-    
+    // Check if section exists in the sections table
+    const sectionData = await getSectionByName(sectionName);
     if (!sectionData) {
-        const availableSections = allSections
-            .filter(sec => sec.class_name === className)
-            .map(sec => sec.section_name)
-            .join(', ');
-        
-        if (availableSections) {
-            throw new Error(`Section '${sectionName}' does not exist for class '${className}'. Available sections for ${className}: ${availableSections}`);
-        } else {
-            throw new Error(`No sections available for class '${className}'`);
-        }
+        // Get all available sections for error message
+        const allSections = await getAllSections();
+        const availableSections = allSections.map(sec => sec.name).join(', ');
+        throw new Error(`Section '${sectionName}' does not exist. Available sections: ${availableSections}`);
+    }
+    
+    // Check if the section is assigned to this class
+    // The sections field in classes table contains comma-separated section names
+    const classSections = classData.sections || '';
+    const assignedSections = classSections.split(',').map(s => s.trim()).filter(s => s.length > 0);
+    
+    if (!assignedSections.includes(sectionName)) {
+        const availableForClass = assignedSections.length > 0 ? assignedSections.join(', ') : 'None';
+        throw new Error(`Section '${sectionName}' is not assigned to class '${className}'. Available sections for ${className}: ${availableForClass}`);
     }
     
     return { classData, sectionData };
@@ -69,26 +66,26 @@ const validateClassAndSection = async (className, sectionName) => {
 const extractStudentData = (data) => {
     return {
         userId: data.userId || null,
-        name: data.name || null,
+        name: data.name?.trim() || null,
         roleId: 3, // Student role
-        gender: data.gender || null,
-        phone: data.phone || null,
-        email: data.email || null,
+        gender: data.gender?.toLowerCase() || null,
+        phone: data.phone?.trim() || null,
+        email: data.email?.trim().toLowerCase() || null,
         dob: data.dob ? new Date(data.dob) : null,
-        currentAddress: data.currentAddress || null,
-        permanentAddress: data.permanentAddress || null,
-        fatherName: data.fatherName || null,
-        fatherPhone: data.fatherPhone || null,
-        motherName: data.motherName || null,
-        motherPhone: data.motherPhone || null,
-        guardianName: data.guardianName || null,
-        guardianPhone: data.guardianPhone || null,
-        relationOfGuardian: data.relationOfGuardian || null,
+        currentAddress: data.currentAddress?.trim() || null,
+        permanentAddress: data.permanentAddress?.trim() || null,
+        fatherName: data.fatherName?.trim() || null,
+        fatherPhone: data.fatherPhone?.trim() || null,
+        motherName: data.motherName?.trim() || null,
+        motherPhone: data.motherPhone?.trim() || null,
+        guardianName: data.guardianName?.trim() || null,
+        guardianPhone: data.guardianPhone?.trim() || null,
+        relationOfGuardian: data.relationOfGuardian?.trim() || null,
         systemAccess: data.systemAccess || false,
-        className: data.class || null,
-        sectionName: data.section || null,
+        className: data.class?.trim() || null,
+        sectionName: data.section?.trim() || null,
         admissionDt: data.admissionDate ? new Date(data.admissionDate) : null,
-        roll: data.roll || null
+        roll: data.roll ? parseInt(data.roll) : null
     };
 };
 
@@ -181,7 +178,6 @@ const updateStudent = async (data) => {
         message: 'Student updated successfully'
     };
 };
-
 
 const setStudentStatus = async ({ userId, reviewerId, status }) => {
     await checkStudentId(userId);
