@@ -46,17 +46,17 @@ export const StudentAccountEdit: React.FC<StudentAccountEditProps> = ({
 
   React.useEffect(() => {
     if (studentDetail) {
-      const { setValue } = methods;
-      for (const [key, value] of Object.entries(studentDetail) as [
-        keyof StudentProps,
-        StudentDetailValue<StudentProps>
-      ][]) {
-        if (['admissionDate', 'dob'].includes(key)) {
-          setValue(key, typeof value === 'string' ? parseISO(value) : value);
-        } else {
-          setValue(key, value);
-        }
+      console.log('Student Detail:', studentDetail);
+      const formData = { ...studentDetail };
+      // Handle date parsing here only
+      if (formData.admissionDate && typeof formData.admissionDate === 'string') {
+        formData.admissionDate = parseISO(formData.admissionDate);
       }
+      if (formData.dob && typeof formData.dob === 'string') {
+        formData.dob = parseISO(formData.dob);
+      }
+
+      methods.reset(formData); // Use reset instead of setValue loop
     }
   }, [studentDetail, methods]);
 

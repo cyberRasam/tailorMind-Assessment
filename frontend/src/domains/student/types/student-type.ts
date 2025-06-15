@@ -76,6 +76,12 @@ export type StudentData = {
   students: UserAccountBasicProps[];
 };
 
+export type GetStudentDetailResponse = {
+  studentDetail: GetStudentDetailProps;
+  message?: string;
+  success?: boolean;
+};
+
 export type StudentDetail = {
   student: StudentPropsWithId;
 };
