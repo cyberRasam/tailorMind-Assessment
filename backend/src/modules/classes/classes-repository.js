@@ -12,6 +12,12 @@ const getClassDetail = async (id) => {
     return rows[0];
 }
 
+const getClassByName = async (className) => {
+    const query = "SELECT * FROM classes WHERE name = $1";
+    const { rows } = await processDBRequest({ query, queryParams: [className] });
+    return rows[0];
+};
+
 const addNewClass = async (payload) => {
     const { name, sections } = payload;
     const query = `
@@ -45,6 +51,7 @@ const deleteClassById = async (id) => {
 module.exports = {
     getAllClasses,
     getClassDetail,
+    getClassByName,
     addNewClass,
     updateClassDetailById,
     deleteClassById

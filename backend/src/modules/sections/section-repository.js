@@ -20,6 +20,12 @@ const getSectionById = async (id) => {
     return rows[0];
 }
 
+const getSectionByName = async (sectionName) => {
+    const query = "SELECT * FROM sections WHERE name = $1";
+    const { rows } = await processDBRequest({ query, queryParams: [sectionName] });
+    return rows[0];
+};
+
 const updateSectionById = async (payload) => {
     const { id, name } = payload;
     const query = `
@@ -42,6 +48,7 @@ const deleteSectionById = async (id) => {
 module.exports = {
     getAllSections,
     getSectionById,
+    getSectionByName,
     updateSectionById,
     deleteSectionById,
     addNewSection

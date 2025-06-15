@@ -43,20 +43,86 @@ const findAllStudents = async (payload) => {
     return rows;
 }
 
-const addOrUpdateStudent = async (payload) => {
-    const query = "SELECT * FROM student_add_update($1)";
-    const queryParams = [payload];
-    try {
-    const { rows } = await processDBRequest({ query, queryParams });
-    return rows[0]; // Expected to be { status, message, userId? }
-  } catch (error) {
-    console.error("DB Error in addOrUpdateStudent:", error);
-    return {
-    status: false,
-    message: error.message || "Failed to add/update student"
-    };
-  }
-}
+const findUserByEmail = async (email) => {
+    const result = await processDBRequest({
+        query: 'SELECT * FROM users WHERE email = $1',
+        queryParams: [email]
+    });
+    return result.rows[0];
+};
+
+const createUser = async (userData) => {
+    const { name, email, roleId, reporterId } = userData;
+    const result = await processDBRequest({
+        query: `
+            INSERT INTO users (name, email, role_id, created_dt, reporter_id)
+            VALUES ($1, $2, $3, NOW(), $4)
+            RETURNING id
+        `,
+        queryParams: [name, email, roleId, reporterId]
+    });
+    return result.rows[0].id;
+};
+
+const createUserProfile = async (profileData) => {
+    const {
+        userId, gender, phone, dob, admissionDt, className, sectionName, roll,
+        currentAddress, permanentAddress, fatherName, fatherPhone, motherName,
+        motherPhone, guardianName, guardianPhone, relationOfGuardian
+    } = profileData;
+
+    await processDBRequest({
+        query: `
+            INSERT INTO user_profiles (
+                user_id, gender, phone, dob, admission_dt, class_name, section_name, roll,
+                current_address, permanent_address, father_name, father_phone, mother_name,
+                mother_phone, guardian_name, guardian_phone, relation_of_guardian
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
+        `,
+        queryParams: [
+            userId, gender, phone, dob, admissionDt, className, sectionName, roll,
+            currentAddress, permanentAddress, fatherName, fatherPhone, motherName,
+            motherPhone, guardianName, guardianPhone, relationOfGuardian
+        ]
+    });
+};
+
+const updateUser = async (userId, userData) => {
+    const { name, email, roleId, systemAccess } = userData;
+    await processDBRequest({
+        query: `
+            UPDATE users 
+            SET name = $1, email = $2, role_id = $3, is_active = $4, updated_dt = NOW()
+            WHERE id = $5
+        `,
+        queryParams: [name, email, roleId, systemAccess, userId]
+    });
+};
+
+const updateUserProfile = async (userId, profileData) => {
+    const {
+        gender, phone, dob, admissionDt, className, sectionName, roll,
+        currentAddress, permanentAddress, fatherName, fatherPhone, motherName,
+        motherPhone, guardianName, guardianPhone, relationOfGuardian
+    } = profileData;
+
+    await processDBRequest({
+        query: `
+            UPDATE user_profiles 
+            SET gender = $1, phone = $2, dob = $3, admission_dt = $4, class_name = $5,
+                section_name = $6, roll = $7, current_address = $8, permanent_address = $9,
+                father_name = $10, father_phone = $11, mother_name = $12, mother_phone = $13,
+                guardian_name = $14, guardian_phone = $15, relation_of_guardian = $16
+            WHERE user_id = $17
+        `,
+        queryParams: [
+            gender, phone, dob, admissionDt, className, sectionName, roll,
+            currentAddress, permanentAddress, fatherName, fatherPhone, motherName,
+            motherPhone, guardianName, guardianPhone, relationOfGuardian, userId
+        ]
+    });
+};
+
 
 const findStudentDetail = async (id) => {
     const query = `
@@ -96,11 +162,12 @@ const findStudentToSetStatus = async ({ userId, reviewerId, status }) => {
     const query = `
         UPDATE users
         SET
-            is_active = $1,
+            is_active  = $1,
             status_last_reviewed_dt = $2,
             status_last_reviewer_id = $3
         WHERE id = $4
     `;
+    
     const queryParams = [status, now, reviewerId, userId];
     const { rowCount } = await processDBRequest({ query, queryParams });
     return rowCount
@@ -120,9 +187,8 @@ const findStudentToUpdate = async (paylaod) => {
 }
 
 const deleteStudent = async (id) => {
-    const query = "DELETE FROM users WHERE id = $1";
-    const queryParams = [id];
-    const { rowCount } = await processDBRequest({ query, queryParams });
+    await processDBRequest({ query: 'DELETE FROM user_profiles WHERE user_id = $1', queryParams: [id] });
+    const {rowCount} = await processDBRequest({ query: 'DELETE FROM users WHERE id = $1', queryParams: [id] });
     if (rowCount <= 0) {
         throw new Error("Unable to delete student");
     }
@@ -132,8 +198,12 @@ const deleteStudent = async (id) => {
 module.exports = {
     getRoleId,
     findAllStudents,
-    addOrUpdateStudent,
+    createUser,
+    createUserProfile,
+    updateUser,
+    updateUserProfile,
     findStudentDetail,
+    findUserByEmail,
     findStudentToSetStatus,
     findStudentToUpdate,
     deleteStudent,

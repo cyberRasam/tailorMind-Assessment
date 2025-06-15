@@ -1,6 +1,8 @@
 const { ApiError, sendAccountVerificationEmail } = require("../../utils");
-const { findAllStudents, findStudentDetail, findStudentToSetStatus, addOrUpdateStudent, deleteStudent } = require("./students-repository");
+const { findAllStudents, findStudentDetail, findStudentToSetStatus, deleteStudent, updateUserProfile, updateUser, createUserProfile, createUser, findUserByEmail } = require("./students-repository");
 const { findUserById } = require("../../shared/repository");
+const { getAllClasses } = require("../classes/classes-repository");
+const { getAllSections } = require("../sections/section-repository");
 
 const checkStudentId = async (id) => {
     const isStudentFound = await findUserById(id);
@@ -29,43 +31,161 @@ const getStudentDetail = async (id) => {
     return student;
 }
 
-const addNewStudent = async (payload) => {
-    const ADD_STUDENT_AND_EMAIL_SEND_SUCCESS = "Student added and verification email sent successfully.";
-    const ADD_STUDENT_AND_BUT_EMAIL_SEND_FAIL = "Student added, but failed to send verification email.";
-
-    let result;
-    try {
-        result = await addOrUpdateStudent(payload);
-        // if (!result.status) {
-        //     throw new ApiError(501, result.message);
-        // }
-
-        try {
-            await sendAccountVerificationEmail({ userId: result.userId, userEmail: payload.email });
-            return { message: ADD_STUDENT_AND_EMAIL_SEND_SUCCESS };
-        } catch (error) {
-            return { message: ADD_STUDENT_AND_BUT_EMAIL_SEND_FAIL }
-        }
-    } catch (error) {
-        console.error("Error in addNewStudent:", error);
-
-        throw new ApiError(500, result.message || "Unable to add student2");
-    }
-}
-
-const updateStudent = async (payload) => {
-    const result = await addOrUpdateStudent(payload);
+const validateClassAndSection = async (className, sectionName) => {
+    // Get all active classes
+    const allClasses = await getAllClasses();
     
-    if (!result) {
-        throw new ApiError(500, "Unable to update student");
+    // Check if class exists
+    const classData = allClasses.find(cls => cls.class_name === className);
+    if (!classData) {
+        const availableClasses = allClasses.map(cls => cls.class_name).join(', ');
+        throw new Error(`Class '${className}' does not exist. Available classes: ${availableClasses}`);
+    }
+    
+    // Get all active sections
+    const allSections = await getAllSections();
+    
+    // Check if section exists for this class
+    const sectionData = allSections.find(sec => 
+        sec.section_name === sectionName && sec.class_name === className
+    );
+    
+    if (!sectionData) {
+        const availableSections = allSections
+            .filter(sec => sec.class_name === className)
+            .map(sec => sec.section_name)
+            .join(', ');
+        
+        if (availableSections) {
+            throw new Error(`Section '${sectionName}' does not exist for class '${className}'. Available sections for ${className}: ${availableSections}`);
+        } else {
+            throw new Error(`No sections available for class '${className}'`);
+        }
+    }
+    
+    return { classData, sectionData };
+};
+
+const extractStudentData = (data) => {
+    return {
+        userId: data.userId || null,
+        name: data.name || null,
+        roleId: 3, // Student role
+        gender: data.gender || null,
+        phone: data.phone || null,
+        email: data.email || null,
+        dob: data.dob ? new Date(data.dob) : null,
+        currentAddress: data.currentAddress || null,
+        permanentAddress: data.permanentAddress || null,
+        fatherName: data.fatherName || null,
+        fatherPhone: data.fatherPhone || null,
+        motherName: data.motherName || null,
+        motherPhone: data.motherPhone || null,
+        guardianName: data.guardianName || null,
+        guardianPhone: data.guardianPhone || null,
+        relationOfGuardian: data.relationOfGuardian || null,
+        systemAccess: data.systemAccess || false,
+        className: data.class || null,
+        sectionName: data.section || null,
+        admissionDt: data.admissionDate ? new Date(data.admissionDate) : null,
+        roll: data.roll || null
+    };
+};
+
+const addStudent = async (data) => {
+    const studentData = extractStudentData(data);
+
+    await validateClassAndSection(studentData.className, studentData.sectionName);
+
+    // Check if user already exists
+    const existingUser = await findUserByEmail(studentData.email);
+    if (existingUser) {
+        throw new Error('Email already exists');
     }
 
-    return { message: result.message };
-}
+    // Create user (reporterId can be set to 1 or any default admin ID)
+    const userId = await createUser({
+        name: studentData.name,
+        email: studentData.email,
+        roleId: studentData.roleId,
+        reporterId: 1 // Default admin ID or pass from request
+    });
+
+    // Create user profile
+    await createUserProfile({
+        userId,
+        gender: studentData.gender,
+        phone: studentData.phone,
+        dob: studentData.dob,
+        admissionDt: studentData.admissionDt,
+        className: studentData.className,
+        sectionName: studentData.sectionName,
+        roll: studentData.roll,
+        currentAddress: studentData.currentAddress,
+        permanentAddress: studentData.permanentAddress,
+        fatherName: studentData.fatherName,
+        fatherPhone: studentData.fatherPhone,
+        motherName: studentData.motherName,
+        motherPhone: studentData.motherPhone,
+        guardianName: studentData.guardianName,
+        guardianPhone: studentData.guardianPhone,
+        relationOfGuardian: studentData.relationOfGuardian
+    });
+
+    return {
+        userId: userId,
+        message: 'Student added successfully'
+    };
+};
+
+const updateStudent = async (data) => {
+    const studentData = extractStudentData(data);
+
+    // Check if user exists
+    await checkStudentId(studentData.userId);
+
+    // Validate class and section
+    await validateClassAndSection(studentData.className, studentData.sectionName);
+
+
+    // Update user
+    await updateUser(studentData.userId, {
+        name: studentData.name,
+        email: studentData.email,
+        roleId: studentData.roleId,
+        systemAccess: studentData.systemAccess
+    });
+
+    // Update user profile
+    await updateUserProfile(studentData.userId, {
+        gender: studentData.gender,
+        phone: studentData.phone,
+        dob: studentData.dob,
+        admissionDt: studentData.admissionDt,
+        className: studentData.className,
+        sectionName: studentData.sectionName,
+        roll: studentData.roll,
+        currentAddress: studentData.currentAddress,
+        permanentAddress: studentData.permanentAddress,
+        fatherName: studentData.fatherName,
+        fatherPhone: studentData.fatherPhone,
+        motherName: studentData.motherName,
+        motherPhone: studentData.motherPhone,
+        guardianName: studentData.guardianName,
+        guardianPhone: studentData.guardianPhone,
+        relationOfGuardian: studentData.relationOfGuardian
+    });
+
+    return {
+        userId: studentData.userId,
+        message: 'Student updated successfully'
+    };
+};
+
 
 const setStudentStatus = async ({ userId, reviewerId, status }) => {
     await checkStudentId(userId);
-
+    
     const affectedRow = await findStudentToSetStatus({ userId, reviewerId, status });
     if (affectedRow <= 0) {
         throw new ApiError(500, "Unable to disable student");
@@ -88,8 +208,8 @@ const deleteStudentById = async (id) => {
 module.exports = {
     getAllStudents,
     getStudentDetail,
-    addNewStudent,
-    setStudentStatus,
+    addStudent,
     updateStudent,
+    setStudentStatus,
     deleteStudentById,
 };
